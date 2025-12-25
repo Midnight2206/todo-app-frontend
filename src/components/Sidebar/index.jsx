@@ -1,10 +1,12 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { Home, Code } from "lucide-react";
+import { Home, Code, FileText, CheckSquare } from "lucide-react";
 
 const navItems = [
   { name: "Home", path: "/", icon: <Home className="w-5 h-5" /> },
   { name: "Bypass", path: "/bypass", icon: <Code className="w-5 h-5" /> },
+  { name: "Posts", path: "/posts", icon: <FileText className="w-5 h-5" /> },
+  { name: "Tasks", path: "/tasks", icon: <CheckSquare className="w-5 h-5" /> },
 ];
 
 export default function Sidebar() {

@@ -2,9 +2,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "../ui/sonner";
 import Sidebar from "@/components/Sidebar";
 import Home from "@/pages/Home";
+import Tasks from "@/pages/Tasks";
 import TaskDetail from "@/pages/TaskDetail";
 import ByPass from "@/pages/ByPass";
-
+import Posts from "@/pages/Posts";
+import PostDetail from "@/pages/PostDetail";
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -24,8 +26,11 @@ export default function AppRouter() {
 
           <Routes>
             <Route index element={<Home />} />
+            <Route path="/tasks" element={<Tasks />} />
             <Route path="/tasks/:id" element={<TaskDetail />} />
             <Route path="/bypass" element={<ByPass />} />
+            <Route path="/posts" element={<Posts />} />
+            <Route path="/posts/:id" element={<PostDetail />} />
           </Routes>
         </div>
       </div>
