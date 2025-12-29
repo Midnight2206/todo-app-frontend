@@ -1,21 +1,41 @@
-import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
+import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useDeletePostMutation} from "@/features/posts/postApi"
 
-export default function PostCard({ post, onDelete, onClick }) {
+
+export default function PostCard({ post }) {
+  const [deletePost, { isLoading: isDeleteLoading }] = useDeletePostMutation();
+  const navigate = useNavigate();
+
+  const handleDelPost = async (id) => {
+    deletePost(id)
+      .unwrap()
+      .then(() => {
+        toast.success("Đã xóa bài viết thành công! ✨");
+      })
+      .catch((err) => {
+        console.log(err);
+        toast.error("Xóa bài viết thất bại");
+      });
+  }
   return (
-    <Card
-      onClick={onClick}
+    <div className="relative">
+      <Card
+      onClick={() => navigate(`/posts/${post.id}`)}
       className={cn(
         "cursor-pointer rounded-xl transition",
         "hover:bg-muted/50"
       )}
     >
-      <CardContent className="space-y-3 p-4">
+      <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+            <div className="flex items-center justify-center w-10 h-10 text-sm font-semibold rounded-full bg-primary/10 text-primary">
               {post.user?.charAt(0)?.toUpperCase() || "U"}
             </div>
 
@@ -23,7 +43,7 @@ export default function PostCard({ post, onDelete, onClick }) {
               <p className="text-sm font-medium">{post.user}</p>
               <p className="text-xs text-muted-foreground">
                 {post.createdAt}
-                {post.edited && " · Edited"}
+                {(post.updatedAt && post.updatedAt !== post.createdAt) && " · Edited"}
               </p>
             </div>
           </div>
@@ -34,10 +54,10 @@ export default function PostCard({ post, onDelete, onClick }) {
             className="text-destructive"
             onClick={(e) => {
               e.stopPropagation();
-              onDelete(post.id);
+              handleDelPost(post.id);
             }}
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="w-4 h-4" />
           </Button>
         </div>
 
@@ -48,11 +68,17 @@ export default function PostCard({ post, onDelete, onClick }) {
             </h3>
           )}
 
-          <p className="whitespace-pre-line text-sm leading-relaxed">
+          <p className="text-sm leading-relaxed whitespace-pre-line">
             {post.content}
           </p>
         </div>
       </CardContent>
     </Card>
+    {isDeleteLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-black/50 rounded-xl">
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
+        </div>
+      )}
+    </div>
   );
 }

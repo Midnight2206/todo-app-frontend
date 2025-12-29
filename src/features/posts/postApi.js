@@ -2,6 +2,7 @@ import { baseApi } from "@/store/baseApi";
 
 export const postsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    // ------------------- POSTS -------------------
     getPosts: builder.query({
       query: () => ({ url: "/posts", method: "get" }),
       providesTags: ["Posts"],

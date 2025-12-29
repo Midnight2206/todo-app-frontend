@@ -1,159 +1,124 @@
-import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
-  getPostById,
-  getComments,
-  addComment,
-  updatePost,
-  deleteComment,
-} from "@/utils/postApi";
-import PostDetailSkeleton from "./PostDetailSkeleton";
+  useGetPostByIdQuery,
+  useUpdatePostMutation,
+} from "@/features/posts/postApi";
+import { toast } from "sonner";
 import {
   Heart,
   MessageCircle,
   Pencil,
   X,
   MoreHorizontal,
-  Send,
   ArrowLeft,
   Clock,
   Save,
-  Smile,
   Sparkles,
 } from "lucide-react";
+import PostContent from "./PostContent";
+import PostDetailSkeleton from "./PostDetailSkeleton";
+import { useForm, FormProvider, useWatch } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import PostComments from "@/features/comments/components/PostComments";
 
 export default function PostDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [isEditingPost, setIsEditingPost] = useState(false);
-  const [editTitle, setEditTitle] = useState("");
-  const [editContent, setEditContent] = useState("");
-  const [post, setPost] = useState(null);
-  const [comments, setComments] = useState([]);
-  const [content, setContent] = useState("");
-  const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(1200);
-
-  const { id } = useParams();
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const post = await getPostById(id);
-      setPost(post?.data?.data);
-      setEditContent(post?.data?.data?.content || "");
-      setEditTitle(post?.data?.data?.title || "");
-      const comments = await getComments(id);
-      setComments(comments?.data?.data);
-    } catch (error) {
-      console.error("Error fetching post:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const {
+    data: post,
+    isLoading: isPostLoading,
+    isError: isPostError,
+    error,
+  } = useGetPostByIdQuery(id);
+  const postForm = useForm({
+    defaultValues: { title: post?.title || "", content: post?.content || "" },
+  });
+  const {title, content} = useWatch({control: postForm.control})
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleUpdatePost = async () => {
-    if (!editTitle.trim() && !editContent.trim()) return;
-    try {
-      await updatePost(id, { title: editTitle, content: editContent });
-      setIsEditingPost(false);
-      setEditTitle("");
-      setEditContent("");
-      fetchData();
-    } catch (error) {
-      console.error("Error updating post:", error);
+    if (isPostError) {
+      toast.error(error?.data?.message || "Không thể tải bài viết");
     }
-  };
-  const handleAddComment = async () => {
-    if (!content.trim()) return;
+  }, [isPostError, error]);
+  useEffect(() => {
+  if (post) {
+    postForm.reset({
+      title: post.title,
+      content: post.content,
+    });
+  }
+}, [post, postForm]);
 
-    const newComment = {
-      author: "Số 1 F8",
-      content,
-    };
-    try {
-      await addComment(id, newComment);
-      setContent("");
-      fetchData();
-    } catch (error) {
-      console.error("Error adding comment:", error);
-    }
-  };
+  const [updatePost] = useUpdatePostMutation();
 
   const handleLike = () => {
     setIsLiked(!isLiked);
     setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
   };
+  const handleUpdatePost = async (postData) => {
+  try {
+    await updatePost({
+      id,
+      postData,
+    }).unwrap();
 
-  const handleCommentLike = (commentId) => {
-    setComments((prev) =>
-      prev.map((cmt) =>
-        cmt.id === commentId
-          ? {
-              ...cmt,
-              isLiked: !cmt.isLiked,
-              likes: cmt.isLiked ? cmt.likes - 1 : cmt.likes + 1,
-            }
-          : cmt
-      )
-    );
-  };
-  const handleDelComment = async (commentId) => {
-    try {
-      await deleteComment(id, commentId);
-      fetchData();
-    } catch (error) {
-      console.error("Error deleting comment:", error);
-    }
-  };
-
-  if (loading) return <PostDetailSkeleton />;
-
+    toast.success("Cập nhật bài viết thành công");
+    setIsEditingPost(false);
+  } catch (err) {
+    toast.error(err?.data?.message || "Cập nhật thất bại");
+  }
+};
+  if (isPostLoading) return <PostDetailSkeleton />;  
   if (!post)
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <div className="p-4 rounded-full bg-muted">
-          <Sparkles className="h-8 w-8 text-muted-foreground" />
+          <Sparkles className="w-8 h-8 text-muted-foreground" />
         </div>
         <p className="text-lg font-medium text-muted-foreground">
           Không tìm thấy bài viết
         </p>
-        <button className="px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors">
+        <button
+          className="px-6 py-2 font-medium transition-colors rounded-full cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+          onClick={() => navigate("/posts")}
+        >
           Quay lại
         </button>
       </div>
     );
   return (
-    <div className="min-h-screen bg-linear-to-b from-background via-background to-muted/20 pb-20">
-      {/* Header với hiệu ứng glass */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-xl border-b shadow-sm">
-        <div className="mx-auto max-w-3xl px-4 h-16 flex items-center justify-between">
-          <button className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-accent transition-all font-medium text-foreground">
-            <ArrowLeft className="h-5 w-5" />
+    <div className="min-h-screen pb-20 bg-linear-to-b from-background via-background to-muted/20">
+      <div className="sticky top-0 z-20 border-b shadow-sm bg-background/95 backdrop-blur-xl">
+        <div className="flex items-center justify-between h-16 max-w-3xl px-4 mx-auto">
+          <button
+            className="flex items-center gap-2 px-3 py-2 font-medium transition-all rounded-full cursor-pointer hover:bg-accent text-foreground"
+            onClick={() => navigate("/posts")}
+          >
+            <ArrowLeft className="w-5 h-5" />
             <span>Quay lại</span>
           </button>
-          <span className="font-bold text-base bg-linear-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+          <span className="text-base font-bold text-transparent bg-linear-to-r from-primary to-primary/70 bg-clip-text">
             Chi tiết bài viết
           </span>
-          <button className="p-2 rounded-full hover:bg-accent transition-all">
-            <MoreHorizontal className="h-5 w-5" />
+          <button className="p-2 transition-all rounded-full hover:bg-accent">
+            <MoreHorizontal className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      <div className="mx-auto max-w-3xl px-4 pt-8 pb-4 space-y-8">
-        {/* BÀI VIẾT CHÍNH */}
-        <article className="bg-card rounded-3xl border shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+      <div className="max-w-3xl px-4 pt-8 pb-4 mx-auto space-y-8">
+        <article className="overflow-hidden transition-all duration-300 border shadow-lg bg-card rounded-3xl hover:shadow-xl">
           <div className="p-6 md:p-8">
-            {/* Header bài viết */}
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
                 <div className="relative group">
                   <img
                     src={post.userAvatar}
                     alt={post.user}
-                    className="h-14 w-14 rounded-full border-2 border-primary/20 ring-2 ring-background transition-transform group-hover:scale-105"
+                    className="transition-transform border-2 rounded-full h-14 w-14 border-primary/20 ring-2 ring-background group-hover:scale-105"
                   />
                 </div>
                 <div>
@@ -162,11 +127,11 @@ export default function PostDetail() {
                   </h3>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-full">
-                      <Clock className="h-3 w-3" />
+                      <Clock className="w-3 h-3" />
                       <span className="font-medium">{post.createdAt}</span>
                     </span>
                     {post.edited && (
-                      <span className="bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
+                      <span className="px-2 py-1 font-medium rounded-full bg-primary/10 text-primary">
                         Đã chỉnh sửa
                       </span>
                     )}
@@ -174,53 +139,16 @@ export default function PostDetail() {
                 </div>
               </div>
             </div>
-
-            {/* Nội dung bài viết */}
-            <div className="space-y-5">
-              {/* TITLE */}
-              {!isEditingPost ? (
-                post.title ? (
-                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground leading-tight">
-                    {post.title}
-                  </h1>
-                ) : null
-              ) : (
-                <input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  placeholder="Nhập tiêu đề bài viết (không bắt buộc)"
-                  className="
-        w-full text-2xl md:text-3xl font-extrabold
-        bg-muted/40 rounded-xl px-4 py-3
-        focus:outline-none focus:ring-2 focus:ring-primary/30
-      "
-                />
-              )}
-
-              {/* CONTENT */}
-              {!isEditingPost ? (
-                <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
-                  {post.content}
-                </p>
-              ) : (
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  placeholder="Nội dung bài viết..."
-                  className="
-                      w-full min-h-40
-                      bg-muted/40 rounded-2xl p-4
-                      text-base leading-relaxed
-                      focus:outline-none focus:ring-2 focus:ring-primary/30
-                      resize-none"
-                />
-              )}
-            </div>
+            <FormProvider {...postForm}>
+              <PostContent
+                post={post}
+                isEditingPost={isEditingPost}
+                form={postForm}
+              />
+            </FormProvider>
           </div>
 
           <div className="h-px bg-linear-to-r from-transparent via-border to-transparent" />
-
-          {/* Action buttons */}
           <div className="flex items-center justify-between px-4 py-3 bg-muted/30">
             <div className="flex items-center gap-1">
               <button
@@ -238,9 +166,9 @@ export default function PostDetail() {
                   {likeCount.toLocaleString()}
                 </span>
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 rounded-full text-muted-foreground hover:bg-accent transition-all">
-                <MessageCircle className="h-5 w-5" />
-                <span className="text-sm font-bold">{comments?.length}</span>
+              <button className="flex items-center gap-2 px-4 py-2 transition-all rounded-full text-muted-foreground hover:bg-accent">
+                <MessageCircle className="w-5 h-5" />
+                {/* <span className="text-sm font-bold">{comments?.length}</span> */}
               </button>
 
               {isEditingPost ? (
@@ -249,135 +177,32 @@ export default function PostDetail() {
                     className="flex items-center gap-2 cursor-pointer"
                     onClick={() => setIsEditingPost(false)}
                   >
-                    <X className="h-5 w-5" />
+                    <X className="w-5 h-5" />
                     <span className="text-sm font-medium">Huỷ</span>
                   </button>
-                  <button
+                  <Button
+                    variant="ghost"
+                    disabled={title === post.title && content === post.content}
                     className="flex items-center gap-2 cursor-pointer"
-                    onClick={() => handleUpdatePost()}
+                    onClick={() => handleUpdatePost({title, content})}
                   >
-                    <Save className="h-5 w-5" />
+                    <Save className="w-5 h-5" />
                     <span className="text-sm font-medium">Lưu</span>
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <button
                   className="flex items-center gap-2 cursor-pointer"
                   onClick={() => setIsEditingPost(true)}
                 >
-                  <Pencil className="h-5 w-5" />
+                  <Pencil className="w-5 h-5" />
                   <span className="text-sm font-medium">Chỉnh sửa</span>
                 </button>
               )}
             </div>
           </div>
         </article>
-
-        {/* KHU VỰC BÌNH LUẬN */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-xl font-bold text-foreground flex items-center gap-3">
-              Bình luận
-              <span className="text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-full">
-                {comments.length}
-              </span>
-            </h2>
-          </div>
-
-          {/* Ô nhập bình luận */}
-          <div className="bg-card border rounded-3xl p-5 shadow-md hover:shadow-lg transition-all">
-            <div className="flex gap-4">
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=You"
-                alt="Your avatar"
-                className="h-10 w-10 rounded-full border-2 border-primary/20 ring-2 ring-background shrink-0"
-              />
-              <div className="flex-1 space-y-4">
-                <textarea
-                  placeholder="Chia sẻ suy nghĩ của bạn về bài viết này..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full min-h-24 bg-muted/50 rounded-2xl p-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none border-0"
-                />
-                <div className="flex justify-between items-center">
-                  <button className="p-2 rounded-full text-muted-foreground hover:text-primary hover:bg-accent transition-all">
-                    <Smile className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={handleAddComment}
-                    disabled={!content.trim()}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-full font-semibold shadow-md hover:bg-primary/90 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Đăng bình luận
-                    <Send className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Danh sách bình luận */}
-          {comments.length > 0 ? (
-            <div className="space-y-5 pt-2">
-              {comments.map((cmt) => (
-                <div key={cmt.id} className="flex gap-4 group">
-                  <img
-                    src={cmt.avatar}
-                    alt={cmt.user}
-                    className="h-10 w-10 shrink-0 rounded-full border-2 border-muted ring-2 ring-background transition-transform group-hover:scale-105"
-                  />
-                  <div className="flex-1 space-y-2">
-                    <div className="bg-card border rounded-2xl rounded-tl-sm px-5 py-3.5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-sm font-bold text-foreground hover:text-primary transition-colors cursor-pointer">
-                          {cmt.author}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium bg-muted/50 px-2 py-0.5 rounded-full">
-                          {cmt.createdAt}
-                        </span>
-                      </div>
-                      <p className="text-sm leading-relaxed text-foreground/85">
-                        {cmt.content}
-                      </p>
-                    </div>
-                    <div className="flex gap-5 ml-3 items-center">
-                      <button
-                        className={`text-xs font-bold transition-all flex items-center gap-1.5 ${
-                          cmt.isLiked
-                            ? "text-red-500 hover:text-red-600"
-                            : "text-muted-foreground hover:text-primary"
-                        }`}
-                        onClick={() => handleCommentLike(cmt.id)}
-                      >
-                        <Heart
-                          className={`h-3.5 w-3.5 ${cmt.isLiked ? "fill-current" : ""}`}
-                        />
-                        Thích {cmt.likes > 0 && `(${cmt.likes})`}
-                      </button>
-                      <button className="cursor-pointer text-xs font-bold text-muted-foreground hover:text-primary transition-colors">
-                        Phản hồi
-                      </button>
-                      <button
-                        onClick={() => handleDelComment(cmt?.id)}
-                        className="cursor-pointer text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        Xoá
-                      </button>
-                      <button className="cursor-pointer text-xs font-bold text-muted-foreground hover:text-primary transition-colors">
-                        Sửa
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <MessageCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-sm font-medium">Chưa có bình luận nào</p>
-            </div>
-          )}
-        </div>
+        <PostComments postId={id}/>
       </div>
     </div>
   );
