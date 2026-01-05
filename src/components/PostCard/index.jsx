@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";

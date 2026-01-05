@@ -1,124 +1,111 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
 import AddTaskForm from "@/components/AddTaskForm";
+import TaskCard from "@/components/TaskCard";
+
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
+  DialogOverlay,
 } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 import { Plus } from "lucide-react";
-import TaskCard from "@/components/TaskCard";
 import { Button } from "@/components/ui/button";
-import { getTasks, deleteTask, toggleCompleted } from "@/utils/taskApi";
 import { toast } from "sonner";
 
+import { useGetTasksQuery } from "@/features/tasks/taskApi";
+
 export default function Tasks() {
-    const navigate = useNavigate();
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const [isAddOpen, setIsAddOpen] = useState(false);
 
+  const {
+    data: tasks = [],
+    isLoading,
+    isError,
+    error,
+  } = useGetTasksQuery();
+
   useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
-      const { data } = await getTasks();
-      setTasks(data);
-    } catch (err) {
-      console.log(err);
-      toast.error("Failed to load tasks");
-    } finally {
-      setLoading(false);
+    if (isError) {
+      toast.error(error?.data?.message || "Failed to load tasks");
     }
-  };
-
-  const handleTaskAdded = () => {
-    fetchTasks();
-  };
-
-  const handleToggleCompleted = async (task) => {
-    try {
-      await toggleCompleted(task.id);
-      fetchTasks()
-        toast.success("Task updated");
-    } catch (err) {
-      console.log(err);
-      toast.error("Toggle failed");
-    }
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await deleteTask(id);
-      fetchTasks();
-      toast.success("Task deleted");
-    } catch (err) {
-      console.log(err);
-      toast.error("Delete failed");
-    }
-  };
+  }, [isError, error]);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-50">
       {/* Header */}
-      <div className="sticky top-0 z-10 border-b bg-background">
-        <div className="flex items-center justify-between max-w-3xl px-4 py-4 mx-auto">
+      <header className="sticky top-0 z-10 bg-white border-b">
+        <div className="flex items-center justify-between max-w-4xl px-4 py-4 mx-auto">
           <div>
-            <h1 className="text-xl font-semibold">Todo List</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Todo List
+            </h1>
+            <p className="text-sm text-slate-500">
               Manage your daily tasks
             </p>
           </div>
 
-          <Button onClick={() => setIsAddOpen(true)} className="gap-2">
+          <Button
+            onClick={() => setIsAddOpen(true)}
+            className="gap-2 shadow-sm"
+          >
             <Plus size={16} />
             Add Task
           </Button>
         </div>
-      </div>
+      </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl px-4 py-6 mx-auto space-y-4">
-          {loading && (
-            <p className="text-center text-muted-foreground">
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl px-4 py-6 mx-auto space-y-4">
+          {isLoading && (
+            <div className="py-10 text-center text-slate-500">
               Loading tasks...
-            </p>
+            </div>
           )}
-          {!loading && tasks.length === 0 && (
-            <p className="text-center text-muted-foreground">No tasks found</p>
+
+          {!isLoading && tasks.length === 0 && (
+            <div className="py-16 text-center text-slate-400">
+              <p className="text-lg font-medium">No tasks yet</p>
+              <p className="text-sm">
+                Click <strong>Add Task</strong> to create your first task
+              </p>
+            </div>
           )}
-          {!loading &&
+
+          {!isLoading &&
             tasks.map((task) => (
               <TaskCard
-                onClick={() => navigate(`/tasks/${task.id}`)}
                 key={task.id}
                 task={task}
-                onToggleCompleted={handleToggleCompleted}
-                onDelete={handleDelete}
+                onClick={() => navigate(`/tasks/${task.id}`)}
               />
             ))}
         </div>
-      </div>
+      </main>
 
-      {/* Add Task Modal */}
+      {/* Add Task Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent>
-          <h2 className="mb-4 text-lg font-semibold">Add New Task</h2>
-          <DialogTitle><VisuallyHidden>Add New Task</VisuallyHidden></DialogTitle>
-          <DialogDescription>
-            Please fill in the task details below.
+        {/* Overlay đẹp hơn */}
+        <DialogOverlay className="bg-black/30 backdrop-blur-sm" />
+
+        <DialogContent
+          className="max-w-md p-6 bg-white shadow-xl  rounded-xl"
+        >
+          <DialogTitle>
+            <VisuallyHidden>Add New Task</VisuallyHidden>
+          </DialogTitle>
+
+          <DialogDescription className="mb-4 text-slate-500">
+            Fill in the task details below
           </DialogDescription>
-          <AddTaskForm
-            onClose={() => setIsAddOpen(false)}
-            onTaskAdded={handleTaskAdded}
-          />
+
+          <AddTaskForm onClose={() => setIsAddOpen(false)} />
         </DialogContent>
       </Dialog>
     </div>

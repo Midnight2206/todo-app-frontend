@@ -1,6 +1,13 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { ArrowLeft, Save, RotateCcw, Clock, Edit3 } from "lucide-react";
+
+import {
+  useGetTaskByIdQuery,
+  useUpdateTaskMutation,
+} from "@/features/tasks/taskApi";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,129 +18,161 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 
-import { useForm, Controller, useWatch } from "react-hook-form";
 import { LEVELS, COLORS } from "@/utils/constants";
-import { getTask, updateTask } from "@/utils/taskApi";
 
 export default function TaskDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [task, setTask] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  const { register, handleSubmit, reset, control } = useForm();
+  /* -------------------- API -------------------- */
+  const {
+    data: task,
+    isLoading,
+    isError,
+  } = useGetTaskByIdQuery(id);
+
+  const [updateTask, { isLoading: isUpdating }] =
+    useUpdateTaskMutation();
+
+  /* -------------------- FORM -------------------- */
+  const { control, register, handleSubmit, reset } = useForm({
+    defaultValues: {
+      title: "",
+      level: "",
+      color: "",
+    },
+  });
 
   useEffect(() => {
-    const fetchTask = async () => {
-      try {
-        setLoading(true);
-        const { data } = await getTask(id);
-        setTask(data);
-        if (data) reset(data);
-      } catch (error) {
-        console.log(error);
-        toast.error("Failed to load task");
-        navigate("/");
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (task) reset(task);
+  }, [task, reset]);
 
-    fetchTask();
-  }, [id, reset, navigate]);
-  const watchedValues = useWatch({ control });
+  const watched = useWatch({ control });
+
   const isChanged = task
-    ? Object.keys(task).some((key) => {
-        if (key === "createdAt") return false;
-        return watchedValues?.[key] !== task[key];
-      })
+    ? ["title", "level", "color"].some(
+        (key) => watched?.[key] !== task[key]
+      )
     : false;
-  const fetchTask = async () => {
-      try {
-        setLoading(true);
-        const { data } = await getTask(id);
-        setTask(data);
-        if (data) reset(data);
-      } catch (error) {
-        console.log(error);
-        toast.error("Failed to load task");
-        navigate("/");
-      } finally {
-        setLoading(false);
-      }
-    };
+
+  /* -------------------- SUBMIT -------------------- */
   const onSubmit = async (values) => {
     try {
-      await updateTask(task.id, values);
-      fetchTask();
+      await updateTask({
+        id: task.id,
+        taskData: values,
+      }).unwrap();
+
       toast.success("Task updated successfully");
-    } catch (error) {
-      console.log(error);
-      toast.error("Update failed");
+    } catch (err) {
+      toast.error(err?.data?.message || "Update failed");
     }
   };
 
-  if (loading) {
+  /* -------------------- STATES -------------------- */
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
+      <div className="flex items-center justify-center min-h-screen text-muted-foreground">
         Loading task...
       </div>
     );
   }
 
-  if (!task) {
+  if (isError || !task) {
     return (
-      <div className="flex items-center justify-center h-screen text-gray-400">
-        Task not found
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <p className="text-lg font-semibold">Task not found</p>
+        <Button onClick={() => navigate("/")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
       </div>
     );
   }
 
+  /* -------------------- UI -------------------- */
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-gray-50">
-      <div className="w-full max-w-4xl p-8 space-y-6 bg-white shadow-xl rounded-xl">
+    <div className="min-h-screen px-4 py-8 bg-gray-50">
+      <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate("/")}>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/")}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
+
           <div className="flex gap-2">
-            <Button disabled={!isChanged} variant="outline" onClick={() => reset()}>
+            <Button
+              variant="outline"
+              disabled={!isChanged}
+              onClick={() => reset(task)}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
               Reset
             </Button>
-            <Button onClick={handleSubmit(onSubmit)} disabled={!isChanged}>Save</Button>
+
+            <Button
+              disabled={!isChanged || isUpdating}
+              onClick={handleSubmit(onSubmit)}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isUpdating ? "Saving..." : "Save"}
+            </Button>
           </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Card */}
+        <div className="p-6 space-y-8 bg-white border shadow-sm rounded-xl">
           {/* Title */}
-          <div className="flex flex-col">
-            <label className="mb-2 text-lg font-semibold">Title</label>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">
+              Title
+            </label>
             <Input
-              {...register("title", { required: true })}
-              className="p-3 text-xl"
-              placeholder="Enter task title"
+              {...register("title")}
+              className="text-lg font-medium"
+              placeholder="Task title"
             />
           </div>
 
-          {/* Level */}
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <div className="flex flex-col flex-1">
-              <label className="mb-2 text-lg font-semibold">Level</label>
+          {/* Level & Color */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {/* LEVEL */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">
+                Level
+              </label>
+
               <Controller
-                control={control}
                 name="level"
+                control={control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="p-3 text-lg">
-                      <SelectValue placeholder="Select level" />
+                  <Select
+                    value={field.value || ""}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger className="h-12 bg-white">
+                      <SelectValue placeholder="Select level">
+                        {field.value && (
+                          <span className="font-medium capitalize">
+                            {field.value}
+                          </span>
+                        )}
+                      </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+
+                    <SelectContent className="bg-white rounded-lg shadow-xl">
                       {LEVELS.map((lvl) => (
-                        <SelectItem key={lvl} value={lvl}>
+                        <SelectItem
+                          key={lvl}
+                          value={lvl}
+                          className="py-3 text-base capitalize hover:bg-blue-50"
+                        >
                           {lvl}
                         </SelectItem>
                       ))}
@@ -143,21 +182,54 @@ export default function TaskDetail() {
               />
             </div>
 
-            {/* Color */}
-            <div className="flex flex-col flex-1">
-              <label className="mb-2 text-lg font-semibold">Color</label>
+            {/* COLOR */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">
+                Color
+              </label>
+
               <Controller
-                control={control}
                 name="color"
+                control={control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="p-3 text-lg">
-                      <SelectValue placeholder="Select color" />
+                  <Select
+                    value={field.value || ""}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger className="h-12 bg-white">
+                      <SelectValue placeholder="Select color">
+                        {field.value && (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-4 h-4 border rounded"
+                              style={{
+                                backgroundColor: field.value,
+                              }}
+                            />
+                            <span className="font-medium capitalize">
+                              {field.value}
+                            </span>
+                          </div>
+                        )}
+                      </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+
+                    <SelectContent className="bg-white rounded-lg shadow-xl">
                       {COLORS.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
+                        <SelectItem
+                          key={c}
+                          value={c}
+                          className="py-3 text-base capitalize hover:bg-gray-100"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="w-4 h-4 border rounded"
+                              style={{
+                                backgroundColor: c,
+                              }}
+                            />
+                            {c}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -167,28 +239,38 @@ export default function TaskDetail() {
             </div>
           </div>
 
-          {/* Completed */}
-          <div className="flex items-center gap-4">
-            <Controller
-              control={control}
-              name="completed"
-              render={({ field }) => (
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              )}
-            />
-            <span className="text-lg font-medium">Completed</span>
-          </div>
+          {/* Footer */}
+          <div className="pt-6 space-y-2 text-sm border-t text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Created at:
+              <span className="font-medium text-foreground">
+                {new Date(task.createdAt).toLocaleString()}
+              </span>
+            </div>
 
-          {/* Created Date */}
-          <div>
-            <label className="block mb-1 text-gray-500">
-              Created at: {new Date(task.createdAt).toLocaleString()}
-            </label>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Updated at:
+              <span className="font-medium text-foreground">
+                {new Date(task.updatedAt).toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Edit3 className="w-4 h-4" />
+              {isChanged ? (
+                <Badge variant="outline" className="text-amber-600">
+                  Unsaved changes
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-green-600">
+                  Saved
+                </Badge>
+              )}
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

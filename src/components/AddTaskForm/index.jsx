@@ -1,57 +1,94 @@
 import { useForm, Controller } from "react-hook-form";
 import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LEVELS, COLORS } from "@/utils/constants";
-import { createTask } from "@/utils/taskApi";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-export default function AddTaskForm({ onClose, onTaskAdded }) {
+import { LEVELS, COLORS } from "@/utils/constants";
+import { useCreateTaskMutation } from "@/features/tasks/taskApi";
+
+export default function AddTaskForm({ onClose }) {
   const { register, handleSubmit, reset, control } = useForm({
     defaultValues: {
       title: "",
-      level: "normal",
-      color: "blue",
+      level: LEVELS[0],
+      color: COLORS[0],
     },
   });
 
+  const [createTask, { isLoading }] = useCreateTaskMutation();
+
   const onSubmit = async (values) => {
     try {
-      const newTask = await createTask(values);
-      onTaskAdded(newTask);
-      toast.success("Task added!");
+      await createTask(values).unwrap();
+      toast.success("Task added successfully");
       reset();
-      onClose();
+      onClose?.();
     } catch (error) {
-      console.log(error);
-      toast.error("Failed to add task");
+      toast.error(error?.data?.message || "Failed to add task");
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Title */}
-      <div>
-        <label className="block mb-1 text-sm font-medium">Title</label>
-        <Input {...register("title", { required: true })} placeholder="Task title" />
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-slate-700">
+          Title
+        </label>
+        <Input
+          {...register("title", { required: true })}
+          placeholder="Enter task title"
+          className="transition h-11 bg-slate-50 focus:bg-white"
+        />
       </div>
 
       {/* Level & Color */}
-      <div className="flex gap-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Level */}
-        <div className="flex-1">
-          <label className="block mb-1 text-sm font-medium">Level</label>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-slate-700">
+            Level
+          </label>
           <Controller
             control={control}
             name="level"
             render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select level" />
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger className="transition h-11 bg-slate-50 hover:bg-slate-100">
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+
+                <SelectContent
+                  className="
+                    bg-slate-50
+                    border
+                    shadow-xl
+                    rounded-lg
+                    data-[state=open]:animate-in
+                    data-[state=closed]:animate-out
+                  "
+                >
                   {LEVELS.map((lvl) => (
-                    <SelectItem key={lvl} value={lvl}>
+                    <SelectItem
+                      key={lvl}
+                      value={lvl}
+                      className="
+                        cursor-pointer
+                        rounded-md
+                        px-3 py-2
+                        hover:bg-slate-100
+                        focus:bg-slate-100
+                        data-[state=checked]:bg-slate-200
+                      "
+                    >
                       {lvl}
                     </SelectItem>
                   ))}
@@ -62,19 +99,35 @@ export default function AddTaskForm({ onClose, onTaskAdded }) {
         </div>
 
         {/* Color */}
-        <div className="flex-1">
-          <label className="block mb-1 text-sm font-medium">Color</label>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-slate-700">
+            Color
+          </label>
           <Controller
             control={control}
             name="color"
             render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select color" />
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger className="transition h-11 bg-slate-50 hover:bg-slate-100">
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+
+                <SelectContent
+                  className="border rounded-lg shadow-xl bg-slate-50"
+                >
                   {COLORS.map((color) => (
-                    <SelectItem key={color} value={color}>
+                    <SelectItem
+                      key={color}
+                      value={color}
+                      className="
+                        cursor-pointer
+                        rounded-md
+                        px-3 py-2
+                        hover:bg-slate-100
+                        focus:bg-slate-100
+                        data-[state=checked]:bg-slate-200
+                      "
+                    >
                       {color}
                     </SelectItem>
                   ))}
@@ -85,12 +138,18 @@ export default function AddTaskForm({ onClose, onTaskAdded }) {
         </div>
       </div>
 
-      {/* Buttons */}
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onClose}>
+      {/* Footer */}
+      <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+        >
           Cancel
         </Button>
-        <Button type="submit">Add Task</Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "Adding..." : "Add Task"}
+        </Button>
       </div>
     </form>
   );
